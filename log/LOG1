@@ -101,3 +101,4 @@ INFO:root:SMS sent :  OK
 INFO:root:Subscription working as expected
 DEBUG:requests.packages.urllib3.connectionpool:"GET /subscribe/sub-c-b8b9cd8c-e906-11e2-b383-02ee2ddab7fe/2560973246316205_95e7cd9e/0/14721641581535444?pnsdk=PubNub-Python/3.7.2&uuid=01037d0e-0085-4661-b5ae-bb86f65fbed9 HTTP/1.1" 200 390
 INFO:root:{"uuid":"55dce922-a1bb-4fc8-8f83-dcc4dff1e5f6","event":"/restapi/v1.0/account/~/extension/809646016/presence","timestamp":"2016-08-25T22:29:23.952Z","subscriptionId":"014458c1-282f-4b9d-acec-6018212c77e0","body":{"extensionId":809646016,"telephonyStatus":"NoCall"}}
+DEBUG:requests.packages.urllib3.connectionpool:"GET /subscribe/sub-c-b8b9cd8c-e906-11e2-b383-02ee2ddab7fe/2560973246316205_95e7cd9e/0/14721641639525485?pnsdk=PubNub-Python/3.7.2&uuid=01037d0e-0085-4661-b5ae-bb86f65fbed9 HTTP/1.1" 200 24
