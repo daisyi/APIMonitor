@@ -3,6 +3,7 @@
 
 import os
 import json
+import threading
 import ConfigParser
 from multiprocessing import Process
 from time import sleep
@@ -16,7 +17,6 @@ from threading import Event, Thread
 import sys
 import traceback
 from optparse import OptionParser, OptionGroup
-import threading
 import socket
 import logging
 import random
@@ -27,7 +27,6 @@ import urllib
 import base64
 import json
 import string
-import threading
 
 
 
@@ -44,6 +43,11 @@ if len(sys.argv) > 1:
     level_name = sys.argv[1]
     level = LEVELS.get(level_name, logging.NOTSET)
     logging.basicConfig(level=level)
+
+from logging.handlers import SocketHandler, DEFAULT_TCP_LOGGING_PORT
+
+socketh = SocketHandler('localhost', DEFAULT_TCP_LOGGING_PORT)
+logging.getLogger('').addHandler(socketh)
 
 logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
 rootLogger = logging.getLogger()
@@ -229,16 +233,67 @@ def send_sms(text, ffrom, to):
     log.error("SMS Sending failed" ) if msg_status['messageStatus'] == 'SendingFailed' else log.info("SMS sent :  OK")
 
 
+#PAGER
+def send_pager(text, ffrom, to):
+    rsp = platform.post("/restapi/v1.0/account/~/extension/~/company-pager", {
+        "from": {"extensionNumber": ffrom},
+        "to": [{"extensionNumber": to}],
+        "text": text
+    })
+    msg_status = rsp.json_dict()
+    log.info("Sending Pager from %(from_ext)s to %(to_ext)s: %(status)s" % {
+        "from_ext": ffrom,
+        "to_ext": to,
+        "status": msg_status['messageStatus']
+    })
+    log.info(rsp.json_dict())
+    log.error("Pager Sending failed") if msg_status['messageStatus'] == 'SendingFailed' else log.info("Pager sent :  OK")
 
+#EXTENSION DATA
+def get_extension_info():
+    extension_info = platform.get("/restapi/v1.0/account/~/extension/~/")
+    # log.debug("Getting extension info %(extensionNumber)s" % {"extensionNumber": extension_info.extensionNumber})
+    log.debug(extension_info.json_dict())
+
+#CHANGE EXTENSION
+def change_extension():
+    log.info("Will change first name")
+    set_first_name(randomword(10))
+
+
+def set_first_name(firstname):
+    data = \
+        {
+            "contact": {
+                "firstName": firstname
+            }
+        }
+    change_extension = platform.put("/restapi/v1.0/account/~/extension/~/", data)
+    log.debug(change_extension.json_dict())
+
+
+def randomword(length):
+    return ''.join(random.choice(string.ascii_letters) for i in range(length))
+
+
+#RESETTING
 def reset_flag():
     RINGOUT_CALL = False
     SUBSCRIPTION_NOTIFICATION = False
 
 #RUN JOB EVERY 5 MIN
 def run_job():
-    make_ringout(FFROM, TTO, "false")
+
+    send_sms("Montior: SMS Test", FFROM , "6197619503")
     time.sleep(5)
-    send_sms("Montior Test", FFROM , "6197619503")
+    send_pager("Montior: Pager Test",'101','102')
+    time.sleep(5)
+    get_extension_info()
+    time.sleep(5)
+    change_extension()
+    time.sleep(5)
+    make_ringout(FFROM, TTO, "false")
+    time.sleep(2)
     if (RINGOUT_CALL==SUBSCRIPTION_NOTIFICATION)==True:
        log.info("Subscription working as expected")
     else:
