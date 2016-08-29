@@ -28,6 +28,8 @@ import urllib
 import base64
 import json
 import string
+import TimedRotatingLog
+
 
 
 
@@ -59,6 +61,13 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 log = logging
+
+
+
+
+
+
+
 
 #Read Credentials from the file
 config = ConfigParser.ConfigParser()
