@@ -8,34 +8,30 @@ from logging.handlers import TimedRotatingFileHandler
 logging.basicConfig(filename="log/LOG1",level=logging.DEBUG)
 
 handler = TimedRotatingFileHandler("log/Logger",
-                                   when="m",
-                                   interval=60,
-                                   backupCount=5)
-
-
-
+								   when="m",
+								   interval=60,
+								   backupCount=5)
 
 LEVELS = {'debug': logging.DEBUG,
-          'info': logging.INFO,
-          'warning': logging.WARNING,
-          'error': logging.ERROR,
-          'critical': logging.CRITICAL}
+		  'info': logging.INFO,
+		  'warning': logging.WARNING,
+		  'error': logging.ERROR,
+		  'critical': logging.CRITICAL}
 
 if len(sys.argv) > 1:
-    level_name = sys.argv[1]
-    level = LEVELS.get(level_name, logging.NOTSET)
-    logging.basicConfig(level=level)
+	level_name = sys.argv[1]
+	level = LEVELS.get(level_name, logging.NOTSET)
+	logging.basicConfig(level=level)
 
 from logging.handlers import SocketHandler, DEFAULT_TCP_LOGGING_PORT
-
 socketh = SocketHandler('localhost', DEFAULT_TCP_LOGGING_PORT)
 logging.getLogger('').addHandler(socketh)
 
 try:
-    import http.client as http_client
+	import http.client as http_client
 except ImportError:
-    # Python 2
-    import httplib as http_client
+	# Python 2
+	import httplib as http_client
 http_client.HTTPConnection.debuglevel = 1
 
 # You must initialize logging, otherwise you'll not see debug output.
@@ -52,19 +48,5 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 rootLogger.addHandler(consoleHandler)
 rootLogger.addHandler(handler)
-
-
-
-# logging.basicConfig()
-# logging.getLogger().setLevel(logging.DEBUG)
-# requests_log = logging.getLogger("requests.packages.urllib3")
-# requests_log.setLevel(logging.DEBUG)
-# requests_log.propagate = True
-
-# rootLogger.addHandler(requests_log)
-
-
-
-
 
 # log = logging
