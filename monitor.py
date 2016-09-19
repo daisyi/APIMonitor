@@ -31,7 +31,7 @@ APP_SECRET = config.get('Credentials', 'APP_SECRET')
 SERVER = config.get('Credentials', 'SERVER')
 FFROM= config.get('Credentials','FFROM')
 TTO= config.get('Credentials','TTO')
-RINGOUT_SLEEP_TIME = int (config.get('Credentials','SLEEPTIME'))
+RINGOUT_SLEEP_TIME = int (config.get('Credentials','RINGOUT_SLEEP_TIME'))
 RUN_JOB_TIME= int (config.get('Credentials','RUNTIME'))
 
 
@@ -52,7 +52,7 @@ class RepeatedTimer:
         self.event = Event()
         self.thread = Thread(target=self._target)
         self.thread.start()
-        log.info("New run initiated")
+        log.debug("New run initiated")
 
     def _target(self):
         while not self.event.wait(self._time):
@@ -119,7 +119,7 @@ platform.auth().set_data(cache)
 def login():
     try:
         platform.is_authorized()
-        log.info('Authorized already by cached data')
+        log.debug('Authorized already by cached data')
     except Exception as e:
         authorize_response = platform.login(USERNAME, EXTENSION, PASSWORD)
 
@@ -128,13 +128,13 @@ def login():
                                                                    "expires_in", "token_type", "endpoint_id", "scope",
                                                                    "refresh_token_expires_in", "expires_in",
                                                                    "refresh_token", "owner_id")):
-                log.info('Authorized by credentials')
+                log.debug('Authorized by credentials')
                 log.debug(authorize_response.json_dict())
         else:
             log.critical("Login Failure. Please fix the application as soon as possible and restart the application")
 
     set_file_cache(platform.auth().data())
-    log.info("Authentication data has been cached")
+    log.debug("Authentication data has been cached")
 
 def refresh():
     try:
@@ -142,8 +142,8 @@ def refresh():
         if all(k in refresh_response.response().json() for k in (
         "access_token", "refresh_token_expires_in", "expires_in", "token_type", "endpoint_id", "scope",
         "refresh_token_expires_in", "expires_in", "refresh_token", "owner_id")):
-            log.info('Refreshed by credentials')
-            log.info(refresh_response.json_dict())
+            log.debug('Refreshed by credentials')
+            log.debug(refresh_response.json_dict())
     except:
         log.critical("Refreshing Failed. Logged in with the new token.")
         login()
@@ -185,16 +185,16 @@ def update_Counter():
     global __counter__
     global __check_Count
     __check_Count = __counter__.increment()
-    log.critical(__check_Count)
+
 
 
 #Check the working of the subscription
 def check_Result():
-    log.info('checking result')
+    log.debug('checking result')
     try:
         i = int (__check_Count)
         if i == 3 :
-            log.info("Subscription working as expected")
+            log.debug("Subscription working as expected")
         elif i == 1 or i == 2:
             log.critical("Missing notifications in Subscription")
         elif i == 0:
@@ -227,12 +227,12 @@ def send_sms(text, ffrom, to):
         "text": text
     })
     msg_status = rsp.json_dict()
-    log.info("Sending SMS from %(from_number)s to %(to_number)s: %(status)s" % {
+    log.debug("Sending SMS from %(from_number)s to %(to_number)s: %(status)s" % {
         "from_number": ffrom,
         "to_number": to,
         "status": msg_status['messageStatus']
     })
-    log.info(rsp.json_dict())
+    log.debug(rsp.json_dict())
     log.error("SMS Sending failed" ) if msg_status['messageStatus'] == 'SendingFailed' else log.info("SMS sent :  OK")
 
 #PAGER
@@ -243,12 +243,12 @@ def send_pager(text, ffrom, to):
         "text": text
     })
     msg_status = rsp.json_dict()
-    log.info("Sending Pager from %(from_ext)s to %(to_ext)s: %(status)s" % {
+    log.debug("Sending Pager from %(from_ext)s to %(to_ext)s: %(status)s" % {
         "from_ext": ffrom,
         "to_ext": to,
         "status": msg_status['messageStatus']
     })
-    log.info(rsp.json_dict())
+    log.debug(rsp.json_dict())
     log.error("Pager Sending failed") if msg_status['messageStatus'] == 'SendingFailed' else log.info("Pager sent :  OK")
 
 #EXTENSION DATA
@@ -261,7 +261,7 @@ def randomword(length):
 
 #CHANGE EXTENSION
 def change_extension():
-    log.info("Will change first name")
+    log.debug("Will change first name")
     set_first_name(randomword(10))
 
 #EDIT EXTENSION
