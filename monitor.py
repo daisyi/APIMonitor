@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# encoding: utf-8
-
 import os
 import json
 import threading
@@ -11,61 +8,15 @@ from time import sleep
 from ringcentral.subscription import Events
 from ringcentral.http.api_exception import ApiException
 from ringcentral import SDK
-import time
 from threading import Event, Thread
-
-
 import sys
 import traceback
-from optparse import OptionParser, OptionGroup
-import socket
-import logging
+import logger
 import random
 import datetime
 import time
-import httplib
-import urllib
-import base64
 import json
 import string
-import TimedRotatingLog
-
-
-
-
-
-logging.basicConfig(filename="log/LOG1",level=logging.DEBUG)
-
-LEVELS = {'debug': logging.DEBUG,
-          'info': logging.INFO,
-          'warning': logging.WARNING,
-          'error': logging.ERROR,
-          'critical': logging.CRITICAL}
-
-if len(sys.argv) > 1:
-    level_name = sys.argv[1]
-    level = LEVELS.get(level_name, logging.NOTSET)
-    logging.basicConfig(level=level)
-
-from logging.handlers import SocketHandler, DEFAULT_TCP_LOGGING_PORT
-
-socketh = SocketHandler('localhost', DEFAULT_TCP_LOGGING_PORT)
-logging.getLogger('').addHandler(socketh)
-
-logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-rootLogger = logging.getLogger()
-fileHandler = logging.FileHandler("{0}/{1}.log".format("log", "log"))
-fileHandler.setFormatter(logFormatter)
-rootLogger.addHandler(fileHandler)
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-rootLogger.addHandler(consoleHandler)
-log = logging
-
-
-
-
-
 
 
 
@@ -80,51 +31,15 @@ APP_SECRET = config.get('Credentials', 'APP_SECRET')
 SERVER = config.get('Credentials', 'SERVER')
 FFROM= config.get('Credentials','FFROM')
 TTO= config.get('Credentials','TTO')
+RINGOUT_SLEEP_TIME = int (config.get('Credentials','SLEEPTIME'))
+RUN_JOB_TIME= int (config.get('Credentials','RUNTIME'))
+
 
 cache_dir = os.path.join(os.getcwd(), '_cache')
 file_path = os.path.join(cache_dir, 'platform.json')
 
 
-SUBSCRIPTION_PREFIX = "/restapi/v1.0/account/~/extension"
-
-PRESENCE_STATUS_TEMPLATE = """<?xml version=\"1.0\"?>
-<presence version=\"1.0\">
-<user entity=\"blf%(mailBoxId)s\">
-<status state=\"%(telephonyStatus)s\" id=\"%(sequenceId)d\" source=\"%(sourceId)s\">
-<call presence.cseq=\"%(cseq)s\" owner=\"%(sourceId)s\" direction=\"initiator\" rc-session-id=\"1234567\"/>
-</status>
-</user>
-</presence>"""
-
-
-class SubscriptionType:
-    PRESENCE = "/~/presence?detailedTelephonyState=true"
-    AGGREGATED_PRESENCE = "/~/presence?aggregated=true&detailedTelephonyState=true"
-    MESSAGE_STORE = "/~/message-store"
-    EXTENSION = "/~"
-    PRESENCE_LINES = "/~/presence/line"
-    INCOMING_CALL = "/~/incoming-call-pickup"
-
-
-def logger_func_args(f):
-    def ret(*args, **kwards):
-        log.info("E:{}(args = {} kwards = {})".format(f.__name__, args, kwards))
-        f(*args, **kwards)
-        log.info("L:{}(args = {} kwards = {})".format(f.__name__, args, kwards))
-    return ret
-
-def time_logger(f):
-    def ret(*args, **kwards):
-        now = datetime.datetime.now()
-        res = f(*args, **kwards)
-        log.info("{} : time spent {} sec.".format(f.__name__, (datetime.datetime.now() - now).total_seconds()))
-        return res
-    return ret
-
-
-SUBSCRIPTION_NOTIFICATION = False
-RINGOUT_CALL = False
-
+log= logger.logging
 
 class RepeatedTimer:
     """Repeat `function` every `interval` seconds."""
@@ -151,6 +66,25 @@ class RepeatedTimer:
         self.event.set()
         self.thread.join()
 
+class AtomicCounter:
+
+    def __init__(self, initial=0):
+        """Initialize a new atomic counter to given initial value (default 0)."""
+        self.value = initial
+        self._lock = threading.Lock()
+
+    def increment(self, num=1):
+        """Atomically increment the counter by num (default 1) and return the
+        new value.
+        """
+        with self._lock:
+            self.value += num
+            return self.value
+
+    def reset(self):
+        with self._lock:
+            self.value = 0
+            return self.value
 
 def get_file_cache():
     try:
@@ -161,16 +95,19 @@ def get_file_cache():
     except IOError:
         return {}
 
-
 def set_file_cache(cache):
     if not os.path.isdir(cache_dir):
         os.mkdir(cache_dir)
+        os.system('chmod 777 -R _cache')
     f = open(file_path, 'w')
     json.dump(cache, f, indent=4)
     f.close()
 
-
 cache = get_file_cache()
+
+__counter__ = AtomicCounter(0)
+__check_Count = 0
+
 
 # Create SDK instance
 sdk = SDK(APP_KEY, APP_SECRET, SERVER)
@@ -179,52 +116,108 @@ platform = sdk.platform()
 # Set cached authentication data
 platform.auth().set_data(cache)
 
-
 def login():
     try:
         platform.is_authorized()
         log.info('Authorized already by cached data')
     except Exception as e:
         authorize_response = platform.login(USERNAME, EXTENSION, PASSWORD)
-        if all(k in authorize_response.response().json() for k in ("access_token", "refresh_token_expires_in",
+
+        if(authorize_response.response().status_code):
+            if all(k in authorize_response.response().json() for k in ("access_token", "refresh_token_expires_in",
                                                                    "expires_in", "token_type", "endpoint_id", "scope",
                                                                    "refresh_token_expires_in", "expires_in",
                                                                    "refresh_token", "owner_id")):
-            log.info('Authorized by credentials')
-            log.info(authorize_response.json_dict())
+                log.info('Authorized by credentials')
+                log.debug(authorize_response.json_dict())
+        else:
+            log.critical("Login Failure. Please fix the application as soon as possible and restart the application")
 
     set_file_cache(platform.auth().data())
     log.info("Authentication data has been cached")
 
-
 def refresh():
-    refresh_response =platform.refresh()
-    if all(k in refresh_response.response().json() for k in (
-    "access_token", "refresh_token_expires_in", "expires_in", "token_type", "endpoint_id", "scope",
-    "refresh_token_expires_in", "expires_in", "refresh_token", "owner_id")):
-        log.info('Refreshed by credentials')
-        log.info(refresh_response.json_dict())
+    try:
+        refresh_response =platform.refresh()
+        if all(k in refresh_response.response().json() for k in (
+        "access_token", "refresh_token_expires_in", "expires_in", "token_type", "endpoint_id", "scope",
+        "refresh_token_expires_in", "expires_in", "refresh_token", "owner_id")):
+            log.info('Refreshed by credentials')
+            log.info(refresh_response.json_dict())
+    except:
+        log.critical("Refreshing Failed. Logged in with the new token.")
+        login()
+
+def pubnub():
+    try:
+        s = sdk.create_subscription()
+        s.add_events(['/account/~/extension/~/presence'])
+        s.on(Events.notification, on_message)
+        s.register()
+        while True:
+            sleep(0.1)
+    except KeyboardInterrupt:
+        log.critical("Pubnub listener stopped...")
+
+def pubnub_start():
+    p = threading.Thread(target=pubnub)
+    try:
+        p.start()
+    except KeyboardInterrupt:
+        p.terminate()
+    return p
+
+# Pubnub notifications
+def on_message(msg):
+    try:
+        update_Counter()
+        log.debug(msg)
+    except:
+        log.critical("Subscription not behaving as expected. Please check the log file for further information.")
+
+def resetting():
+    global __counter__
+    global __check_Count
+    newcount = __counter__.reset()
+    __check_Count = 0
+
+def update_Counter():
+    global __counter__
+    global __check_Count
+    __check_Count = __counter__.increment()
+    log.critical(__check_Count)
+
+
+#Check the working of the subscription
+def check_Result():
+    log.info('checking result')
+    try:
+        i = int (__check_Count)
+        if i == 3 :
+            log.info("Subscription working as expected")
+        elif i == 1 or i == 2:
+            log.critical("Missing notifications in Subscription")
+        elif i == 0:
+            log.critical("Subscription is not working as expected. Please check the logs for more information.")
+        else:
+            log.critical("Counter is broken. Please contact the admin.")
+    except:
+        log.critical('Exception Occured in the Check Result. Please check the logs for more information.')
+    finally:
+        resetting()
+
 
 #CREATE RINGOUT CALL
 def make_ringout(ffrom,tto,pprompt):
-
     body = {
         "from": {"phoneNumber": ffrom},
         "to": {"phoneNumber": tto},
         "callerId": {"phoneNumber": ''},
         "playPrompt": pprompt
     }
-    # //self, url, body=None, query_params=None, headers=None, skip_auth_check=False
     response= platform.post(url="/account/~/extension/~/ringout",body=body)
-
-    log.info("Make ringout from %(from_phone)s to %(to_phone)s" % {
-        "from_phone": ffrom,
-        "to_phone": tto,
-        "status": response.json().status.callStatus
-    })
-    RINGOUT_CALL = True
-    log.info(response.json_dict())
-
+    log.debug(response.json_dict())
+    return  response
 
 #SEND SMS
 def send_sms(text, ffrom, to):
@@ -241,7 +234,6 @@ def send_sms(text, ffrom, to):
     })
     log.info(rsp.json_dict())
     log.error("SMS Sending failed" ) if msg_status['messageStatus'] == 'SendingFailed' else log.info("SMS sent :  OK")
-
 
 #PAGER
 def send_pager(text, ffrom, to):
@@ -262,15 +254,17 @@ def send_pager(text, ffrom, to):
 #EXTENSION DATA
 def get_extension_info():
     extension_info = platform.get("/restapi/v1.0/account/~/extension/~/")
-    # log.debug("Getting extension info %(extensionNumber)s" % {"extensionNumber": extension_info.extensionNumber})
     log.debug(extension_info.json_dict())
+
+def randomword(length):
+    return ''.join(random.choice(string.ascii_letters) for i in range(length))
 
 #CHANGE EXTENSION
 def change_extension():
     log.info("Will change first name")
     set_first_name(randomword(10))
 
-
+#EDIT EXTENSION
 def set_first_name(firstname):
     data = \
         {
@@ -282,19 +276,9 @@ def set_first_name(firstname):
     log.debug(change_extension.json_dict())
 
 
-def randomword(length):
-    return ''.join(random.choice(string.ascii_letters) for i in range(length))
-
-
-#RESETTING
-def reset_flag():
-    RINGOUT_CALL = False
-    SUBSCRIPTION_NOTIFICATION = False
-
-#RUN JOB EVERY 5 MIN
-def run_job():
-
-    send_sms("Montior: SMS Test", FFROM , "6197619503")
+#RUN JOB MANAGER --- ADD NEW API CALLS TO THE JOB WHEN REQUIRED
+def run_Job():
+    send_sms("Montior: SMS Test", FFROM , "15856234138")
     time.sleep(5)
     send_pager("Montior: Pager Test",'101','102')
     time.sleep(5)
@@ -302,53 +286,15 @@ def run_job():
     time.sleep(5)
     change_extension()
     time.sleep(5)
+    set_first_name("TESTER")
+    time.sleep(5)
+    check_Ringout_Subscription()
+    check_Result()
+
+
+def check_Ringout_Subscription():
     make_ringout(FFROM, TTO, "false")
-    time.sleep(2)
-    if (RINGOUT_CALL==SUBSCRIPTION_NOTIFICATION)==True:
-       log.info("Subscription working as expected")
-    else:
-        log.CRITICAL("No Subscription Events for Presence")
-    reset_flag()
-
-
-def threaded_run(func, publisher_key, subscriber_key, channel, encryption_key=None, default=None):
-    class InterruptableThread(threading.Thread):
-        def __init__(self):
-            threading.Thread.__init__(self)
-            self.daemon = True
-            self.result = default
-            self.exc_info = (None, None, None)
-
-        def run(self):
-            try:
-                self.result = func(publisher_key, subscriber_key, channel, encryption_key)
-            except Exception as e:
-                traceback.print_exc(file=sys.stdout)
-                self.exc_info = sys.exc_info()
-
-        def suicide(self):
-            raise RuntimeError('Stop has been called')
-
-    it = InterruptableThread()
-    it.start()
-    return it
-
-
-def join_thread(it, timeout):
-    it.join((int)(timeout))
-    if it.exc_info[0] is not None:  # if there were any exceptions
-        a, b, c = it.exc_info
-        raise a, b, c  # communicate that to caller
-    if it.isAlive():
-        try:
-            it.suicide()
-        except RuntimeError:
-            traceback.print_exc(file=sys.stdout)
-            raise RuntimeError(
-                "Timed out after %(d)r seconds. Check your installation for errors or increase timeout interval" %
-                {'d': timeout})
-    else:
-        return it.result
+    time.sleep(RINGOUT_SLEEP_TIME)
 
 
 def main():
@@ -359,40 +305,11 @@ def main():
     # Perform refresh by force
     refresh()
 
-    #run background job for different api endpoints
-    run_job()
-    timer = RepeatedTimer(300, run_job)
+    #Start Subscription
+    pubnub_start()
 
-    # Pubnub notifications example
-    def on_message(msg):
-        SUBSCRIPTION_NOTIFICATION = True
-        if all(k in msg for k in ("uuid", "event","timestamp","subscriptionId","body")):
-            log.info(msg)
-        else:
-            log.error("Subscription not behaving as expected. Please check the log file for further information.")
-            log.error(msg)
-
-    def pubnub():
-        try:
-            s = sdk.create_subscription()
-            s.add_events(['/account/~/extension/~/presence'])
-            s.on(Events.notification, on_message)
-            s.register()
-
-
-            while True:
-                sleep(0.1)
-        except KeyboardInterrupt:
-            log.CRITICAL("Pubnub listener stopped...")
-
-    p = Process(target=pubnub)
-    try:
-        p.start()
-    except KeyboardInterrupt:
-        p.terminate()
-        timer.stop()
-        log.CRITICAL("Stopped by User")
-    log.info("Wait for notification...")
+    #Run RingOut Every X Min
+    timer = RepeatedTimer(RUN_JOB_TIME, run_Job)
 
 
 if __name__ == '__main__':
