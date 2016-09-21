@@ -4,7 +4,7 @@ import json
 import requests
 from email.feedparser import FeedParser
 from .json_object import *
-
+import logging
 
 class ApiResponse:
     def __init__(self, request=None, response=None):
@@ -26,7 +26,6 @@ class ApiResponse:
     def json_dict(self):
         if not self._is_content_type('application/json'):
             raise Exception('Response is not JSON')
-
         return self._response.json()
 
     def json(self):
@@ -53,9 +52,7 @@ class ApiResponse:
             res.headers = dict(payload)
             res._content = str(payload.get_payload())
             res.status_code = response["status"]
-
             responses.append(ApiResponse(response=res))
-
         return responses
 
     def error(self):
@@ -77,7 +74,6 @@ class ApiResponse:
 
         except Exception as e:
             message = message + ' (and additional error happened during JSON parse: ' + e.message + ')'
-
         return message
 
     def request(self):

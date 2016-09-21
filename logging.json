@@ -1,0 +1,38 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "simple": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S"
+        }
+    },
+
+   "handlers": {
+        "my_rotate_timed": {
+            "level": "DEBUG",
+            "class": "myMainPackage.MyRotatingFileHandler",
+            "formatter": "simple",
+            "when": "S",
+            "interval": 86400,
+            "backupCount": 5,
+            "maxBytes": 5242880,
+            "filename": "log/timedRotateLog.log",
+            "encoding": "utf8"
+    }
+
+    },
+
+    "loggers": {
+        "my_module": {
+            "level": "DEBUG",
+            "handlers": ["my_rotate"]
+        }
+    },
+
+    "root": {
+        "level": "DEBUG",
+        "handlers": ["my_rotate"],
+        "propagate": false
+    }
+}

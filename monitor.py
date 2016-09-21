@@ -123,7 +123,7 @@ def login():
 	except Exception as e:
 		authorize_response = platform.login(USERNAME, EXTENSION, PASSWORD)
 
-		if(authorize_response.response().status_code):
+		if(int (authorize_response.response().status_code)==200):
 			if all(k in authorize_response.response().json() for k in ("access_token", "refresh_token_expires_in",
 																   "expires_in", "token_type", "endpoint_id", "scope",
 																   "refresh_token_expires_in", "expires_in",
@@ -196,105 +196,140 @@ def check_Result():
 		if i == 3 :
 			log.debug("Subscription working as expected")
 		elif i == 1 or i == 2:
-			log.critical("Missing notifications in Subscription")
+			log.error("Missing notifications in Subscription")
 		elif i == 0:
 			log.critical("Subscription is not working as expected. Please check the logs for more information.")
 		else:
 			log.critical("Counter is broken. Please contact the admin.")
 	except:
 		log.critical('Exception Occured in the Check Result. Please check the logs for more information.')
+		pass
 	finally:
 		resetting()
 
 
 #CREATE RINGOUT CALL
 def make_ringout(ffrom,tto,pprompt):
-	body = {
-		"from": {"phoneNumber": ffrom},
-		"to": {"phoneNumber": tto},
-		"callerId": {"phoneNumber": ''},
-		"playPrompt": pprompt
-	}
-	response= platform.post(url="/account/~/extension/~/ringout",body=body)
-	log.debug(response.json_dict())
-	return  response
+	try:
+		body = {
+            "from": {"phoneNumber": ffrom},
+            "to": {"phoneNumber": tto},
+            "callerId": {"phoneNumber": ''},
+            "playPrompt": pprompt
+        }
+		response= platform.post(url="/account/~/extension/~/ringout",body=body)
+		log.debug(response.json_dict())
+		return  response
+	except:
+		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+		pass
 
 #SEND SMS
 def send_sms(text, ffrom, to):
-	rsp = platform.post("/restapi/v1.0/account/~/extension/~/sms", {
-		"from": {"phoneNumber": ffrom},
-		"to": [{"phoneNumber": to}],
-		"text": text
-	})
-	msg_status = rsp.json_dict()
-	log.debug("Sending SMS from %(from_number)s to %(to_number)s: %(status)s" % {
-		"from_number": ffrom,
-		"to_number": to,
-		"status": msg_status['messageStatus']
-	})
-	log.debug(rsp.json_dict())
-	log.error("SMS Sending failed" ) if msg_status['messageStatus'] == 'SendingFailed' else log.info("SMS sent :  OK")
+	try:
+		rsp = platform.post("/restapi/v1.0/account/~/extension/~/sms", {
+            "from": {"phoneNumber": ffrom},
+            "to": [{"phoneNumber": to}],
+            "text": text
+        })
+		msg_status = rsp.json_dict()
+		log.debug("Sending SMS from %(from_number)s to %(to_number)s: %(status)s" % {
+            "from_number": ffrom,
+            "to_number": to,
+            "status": msg_status['messageStatus']
+        })
+
+		log.error("SMS Sending failed" ) if msg_status['messageStatus'] == 'SendingFailed' else log.info("SMS sent :  OK")
+	except:
+		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+		pass
 
 #PAGER
 def send_pager(text, ffrom, to):
-	rsp = platform.post("/restapi/v1.0/account/~/extension/~/company-pager", {
-		"from": {"extensionNumber": ffrom},
-		"to": [{"extensionNumber": to}],
-		"text": text
-	})
-	msg_status = rsp.json_dict()
-	log.debug("Sending Pager from %(from_ext)s to %(to_ext)s: %(status)s" % {
-		"from_ext": ffrom,
-		"to_ext": to,
-		"status": msg_status['messageStatus']
-	})
-	log.debug(rsp.json_dict())
-	log.error("Pager Sending failed") if msg_status['messageStatus'] == 'SendingFailed' else log.info("Pager sent :  OK")
+
+		try:
+			rsp = platform.post("/restapi/v1.0/account/~/extension/~/company-page", {
+                "from": {"extensionNumber": ffrom},
+                "to": [{"extensionNumber": to}],
+                "text": text
+            })
+			msg_status = rsp.json_dict()
+			log.debug("Sending Pager from %(from_ext)s to %(to_ext)s: %(status)s" % {
+                "from_ext": ffrom,
+                "to_ext": to,
+                "status": msg_status['messageStatus']
+            })
+			log.debug(rsp.json_dict())
+			log.error("Pager Sending failed") if msg_status['messageStatus'] == 'SendingFailed' else log.info("Pager sent :  OK")
+		except:
+			log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+			pass
+
 
 #EXTENSION DATA
 def get_extension_info():
-	extension_info = platform.get("/restapi/v1.0/account/~/extension/~/")
-	log.debug(extension_info.json_dict())
+	try:
+		extension_info = platform.get("/restapi/v1.0/account/~/extension/~/")
+		log.debug(extension_info.json_dict())
+	except:
+		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+		pass
 
 def randomword(length):
 	return ''.join(random.choice(string.ascii_letters) for i in range(length))
 
 #CHANGE EXTENSION
 def change_extension():
-	log.debug("Will change first name")
-	set_first_name(randomword(10))
+	try:
+		log.debug("Will change first name")
+		set_first_name(randomword(10))
+	except:
+		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+		pass
 
 #EDIT EXTENSION
 def set_first_name(firstname):
-	data = \
-		{
-			"contact": {
-				"firstName": firstname
-			}
-		}
-	change_extension = platform.put("/restapi/v1.0/account/~/extension/~/", data)
-	log.debug(change_extension.json_dict())
+	try:
+		data = \
+            {
+                "contact": {
+                    "firstName": firstname
+                }
+            }
+		change_extension = platform.put("/restapi/v1.0/account/~/extension/~/", data)
+		log.debug(change_extension.json_dict())
+	except:
+		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+		pass
 
 
 #RUN JOB MANAGER --- ADD NEW API CALLS TO THE JOB WHEN REQUIRED
 def run_Job():
-	send_sms("Montior: SMS Test", FFROM , "15856234138")
-	time.sleep(5)
-	send_pager("Montior: Pager Test",'101','102')
-	time.sleep(5)
-	get_extension_info()
-	time.sleep(5)
-	change_extension()
-	time.sleep(5)
-	set_first_name("TESTER")
-	time.sleep(5)
-	check_Ringout_Subscription()
-	check_Result()
-
+	try:
+		log.info("[NEW RUN] initated")
+		send_sms("Montior: SMS Test", FFROM , "15856234138")
+		time.sleep(5)
+		send_pager("Montior: Pager Test",'101','102')
+		time.sleep(5)
+		get_extension_info()
+		time.sleep(5)
+		change_extension()
+		time.sleep(5)
+		set_first_name("TESTER")
+		time.sleep(5)
+		# check_Ringout_Subscription()
+		check_Result()
+	except:
+		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+		pass
 
 def check_Ringout_Subscription():
-	make_ringout(FFROM, TTO, "false")
-	time.sleep(RINGOUT_SLEEP_TIME)
+	try:
+		make_ringout(FFROM, TTO, "false")
+		time.sleep(RINGOUT_SLEEP_TIME)
+	except:
+		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+		pass
 
 
 def main():

@@ -2,44 +2,45 @@ import time
 import re
 import os
 import stat
+import gzip
 import logging
 import logging.handlers as handlers
 
-class TimedRotatingLog(handlers.TimedRotatingFileHandler):
+
+class TimedRotatingLog(logging.handlers.TimedRotatingFileHandler):
+    """ My rotating file hander to compress rotated file """
 
     def __init__(self, filename, mode='a', maxBytes=0, backupCount=0, encoding=None,
                  delay=0, when='h', interval=1, utc=False):
         if maxBytes > 0:
             mode = 'a'
-        handlers.TimedRotatingFileHandler.__init__(
+        logging.handlers.TimedRotatingFileHandler.__init__(
             self, filename, when, interval, backupCount, encoding, delay, utc)
         self.maxBytes = maxBytes
+        self.backupCount = backupCount
 
     def shouldRollover(self, record):
-        if self.stream is None:
+        """ Determine if rollover should occur. """
+        # Check rollover by size
+        if self.stream is None:  # delay was set...
             self.stream = self._open()
-        if self.maxBytes > 0:
+        if self.maxBytes > 0:  # are we rolling over?
             msg = "%s\n" % self.format(record)
-            self.stream.seek(0, 2)
+            self.stream.seek(0, 2)  # due to non-posix-compliant Windows feature
             if self.stream.tell() + len(msg) >= self.maxBytes:
                 return 1
+        # Check rollover by time
         t = int(time.time())
         if t >= self.rolloverAt:
             return 1
         return 0
 
-    # def demo_SizedTimedRotatingFileHandler():
-    #     log_filename = '/tmp/log_rotate'
-    #     logger = logging.getLogger('MyLogger')
-    #     logger.setLevel(logging.DEBUG)
-    #     handler = SizedTimedRotatingFileHandler(
-    #         log_filename, maxBytes=100, backupCount=5,
-    #         when='s', interval=10,
-    #         # encoding='bz2',  # uncomment for bz2 compression
-    #     )
-    #     logger.addHandler(handler)
-    #     for i in range(10000):
-    #         time.sleep(0.1)
-    #         logger.debug('i=%d' % i)
-    #
-    # demo_SizedTimedRotatingFileHandler()
+    def rotate(self, source, dest):
+        """ Compress rotated log file """
+        os.rename(source, dest)
+        f_in = open(dest, 'rb')
+        f_out = gzip.open("%s.gz" % dest, 'wb')
+        f_out.writelines(f_in)
+        f_out.close()
+        f_in.close()
+        os.remove(dest)

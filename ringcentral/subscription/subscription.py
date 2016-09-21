@@ -187,8 +187,8 @@ class Subscription(Observable):
             data = base64.b64decode(message)
             obj2 = AES.new(key)
             decrypted = str(obj2.decrypt(data)).replace('\x05', '')
-            message = json.loads(decrypted)
-        return message
+            # message = json.loads(decrypted)
+        return decrypted
 
     def _unsubscribe_at_pubnub(self):
         if self._pubnub and self.alive():

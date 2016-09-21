@@ -6,6 +6,7 @@ import requests
 
 from .api_response import ApiResponse
 from .api_exception import ApiException
+import logging
 
 
 class Client:
@@ -17,7 +18,6 @@ class Client:
 
         try:
             response = self.load_response(request.prepare())
-
             if response.ok():
                 return response
             else:
@@ -37,6 +37,8 @@ class Client:
             session = requests.sessions.Session()
             response = session.send(request)
             session.close()
+
+            logging.info(response.json())
 
             return ApiResponse(request, response)
 
@@ -84,5 +86,4 @@ class Client:
             body = json.dumps(body)
         elif content_type.lower().find('application/x-www-form-urlencoded') >= 0:
             body = urllib.urlencode(body)
-
         return requests.Request(method, url, headers=headers, data=body)
