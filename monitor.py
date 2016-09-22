@@ -248,7 +248,7 @@ def send_sms(text, ffrom, to):
 def send_pager(text, ffrom, to):
 
 		try:
-			rsp = platform.post("/restapi/v1.0/account/~/extension/~/company-page", {
+			rsp = platform.post("/restapi/v1.0/account/~/extension/~/company-pager", {
                 "from": {"extensionNumber": ffrom},
                 "to": [{"extensionNumber": to}],
                 "text": text
@@ -317,7 +317,7 @@ def run_Job():
 		time.sleep(5)
 		set_first_name("TESTER")
 		time.sleep(5)
-		# check_Ringout_Subscription()
+		check_Ringout_Subscription()
 		check_Result()
 	except:
 		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
