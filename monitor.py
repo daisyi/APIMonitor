@@ -275,6 +275,15 @@ def get_extension_info():
 		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
 		pass
 
+#Calllog DATA
+def get_calllog_info():
+	try:
+		get_calllog_info = platform.get("/restapi/v1.0/account/~/extension/~/call-log")
+		log.debug(get_calllog_info.json_dict())
+	except:
+		log.critical("Exception occured in Run Job. Please contact Admin for further information on exception")
+		pass
+
 def randomword(length):
 	return ''.join(random.choice(string.ascii_letters) for i in range(length))
 
@@ -312,6 +321,8 @@ def run_Job():
 		send_pager("Montior: Pager Test",'101','102')
 		time.sleep(5)
 		get_extension_info()
+		time.sleep(5)
+		get_calllog_info()
 		time.sleep(5)
 		change_extension()
 		time.sleep(5)
